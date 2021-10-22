@@ -1,0 +1,29 @@
+﻿### Estágio 1 - Obter o source e gerar o Build ###
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS dotnet-builder
+
+WORKDIR /app
+WORKDIR /src
+
+COPY ./ ./
+
+RUN dotnet restore ./ApiDocker.csproj -s http://www.nuget.sgi.ms.gov.br/nuget/ -s https://api.nuget.org/v3/index.json -nowarn:msb3202,nu1503
+RUN dotnet build ./ApiDocker.csproj -c Release -o /app/publish
+RUN dotnet publish ./ApiDocker.csproj -c Release -o /app/publish
+
+### Estágio 2 - Subir a aplicação através dos binários ###
+FROM mcr.microsoft.com/dotnet/aspnet:5.0
+
+ENV ASPNETCORE_ENVIRONMENT=Prd \
+    LC_ALL=pt_BR.UTF-8 \
+    LANG=pt_BR.UTF-8 \
+    ASPNETCORE_URLS=http://*:80 
+
+RUN apt-get install -y  tzdata \
+ && ln -sf /usr/share/zoneinfo/America/Campo_Grande /etc/localtime \
+ && echo "America/Campo_Grande" > /etc/timezone \
+ && sed -i '/^ssl_conf = ssl_sect$/s/^/#/' /etc/ssl/openssl.cnf
+    
+WORKDIR /app
+EXPOSE 80
+COPY --from=dotnet-builder /app/publish .
+ENTRYPOINT ["dotnet", "ApiDocker.dll"]
